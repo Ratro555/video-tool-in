@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Видео Мастер Pro (WebCodecs)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gray-900 p-6 text-white">
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Видео Мастер Pro
+            </h1>
+            <p class="text-gray-400 text-sm mt-1">Технология WebCodecs: Гарантированный FPS и Битрейт</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200">
+            <button onclick="window.switchTab('extract')" id="tab-extract" class="flex-1 py-4 text-center font-medium text-gray-500 hover:text-gray-700 tab-active transition">
+                1. Видео в ZIP (Разбор)
+            </button>
+            <button onclick="window.switchTab('create')" id="tab-create" class="flex-1 py-4 text-center font-medium text-gray-500 hover:text-gray-700 transition">
+                2. ZIP в MP4 (Сборка Pro)
+            </button>
+        </div>
+
+        <!-- Content Area -->
+        <div class="p-6 md:p-8 min-h-[400px]">
+            
+            <!-- SECTION 1: EXTRACT -->
+            <div id="section-extract" class="space-y-6">
+                <div class="text-center border-2 border-dashed border-gray-300 rounded-lg p-8 hover:bg-gray-50 transition relative bg-gray-50">
+                    <input type="file" id="videoInput" accept="video/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <div class="space-y-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p class="text-gray-700 font-medium">Загрузите видео файл</p>
+                        <p class="text-xs text-gray-500">MP4, MOV, WEBM</p>
+                    </div>
+                </div>
+
+                <div id="videoPreviewContainer" class="hidden space-y-4">
+                    <p class="text-sm font-bold text-gray-700">Настройки разбора:</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">FPS</label>
+                            <input type="number" id="extractFps" value="24" class="w-full p-2 border rounded bg-white">
+                        </div>
+                        <div>
+                             <label class="block text-xs text-gray-500 mb-1">Формат</label>
+                             <select id="extractFormat" class="w-full p-2 border rounded bg-white">
+                                 <option value="png">PNG (Без потерь)</option>
+                                 <option value="jpeg">JPG</option>
+                             </select>
+                        </div>
+                    </div>
+                    
+                    <button id="extractBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded shadow transition">
+                        Начать разбивку на кадры
+                    </button>
+
+                    <div id="extractProgress" class="hidden space-y-2">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="extractProgressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p id="extractStatus" class="text-xs text-center text-gray-500">Подготовка...</p>
+                    </div>
+                </div>
+                
+                <video id="hiddenVideo" class="hidden" muted playsinline></video>
+                <canvas id="hiddenCanvas" class="hidden"></canvas>
+            </div>
+
+            <!-- SECTION 2: CREATE -->
+            <div id="section-create" class="hidden space-y-6">
+                <div class="text-center border-2 border-dashed border-gray-300 rounded-lg p-8 hover:bg-gray-50 transition relative bg-gray-50">
+                    <input type="file" id="zipInput" accept=".zip" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <div class="space-y-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        <p class="text-gray-700 font-medium">Загрузите ZIP с кадрами</p>
+                        <p class="text-xs text-gray-500">Файлы будут собраны в MP4 с битрейтом 10 Мбит/с</p>
+                    </div>
+                </div>
+
+                <div id="zipPreviewContainer" class="hidden space-y-4">
+                     <div class="bg-blue-50 border border-blue-100 p-4 rounded-lg">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-gray-500 uppercase">Файл</span>
+                            <span id="zipFileName" class="text-xs font-mono text-gray-700 truncate max-w-[150px]"></span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div class="bg-white p-2 rounded border border-blue-100">
+                                <p class="text-[10px] text-gray-400 uppercase">FPS</p>
+                                <p class="text-lg font-bold text-blue-600">24.00</p>
+                            </div>
+                            <div class="bg-white p-2 rounded border border-blue-100">
+                                <p class="text-[10px] text-gray-400 uppercase">Битрейт</p>
+                                <p class="text-lg font-bold text-blue-600">~10 Mbps</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="createBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded shadow transition flex items-center justify-center gap-2">
+                        <span>Собрать Видео (Рендер)</span>
+                    </button>
+
+                    <div id="createProgress" class="hidden space-y-2">
+                         <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="createProgressBar" class="bg-green-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p id="createStatus" class="text-xs text-center text-gray-500">Инициализация энкодера...</p>
+                    </div>
+                    
+                    <div class="border rounded-lg overflow-hidden bg-black flex justify-center relative shadow-inner">
+                        <span class="absolute top-2 left-2 text-[10px] uppercase tracking-wider text-white opacity-60 bg-black/50 px-2 rounded">Preview</span>
+                        <canvas id="assemblyCanvas" class="max-w-full h-auto" style="max-height: 250px;"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MAIN SCRIPT (MODULE) -->
+    <script type="module">
+        // Import MP4 Muxer from CDN
+        import * as Mp4Muxer from "https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.4/+esm";
+
+        // --- GLOBAL UI HANDLERS ---
+        window.switchTab = (tab) => {
+            document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`section-${tab}`).classList.remove('hidden');
+            
+            document.querySelectorAll('[id^="tab-"]').forEach(el => {
+                el.classList.remove('tab-active', 'text-blue-600');
+                el.classList.add('text-gray-500');
+            });
+            document.getElementById(`tab-${tab}`).classList.add('tab-active', 'text-blue-600');
+            document.getElementById(`tab-${tab}`).classList.remove('text-gray-500');
+        };
+
+        // --- PART 1: EXTRACT LOGIC ---
+        const videoInput = document.getElementById('videoInput');
+        const extractBtn = document.getElementById('extractBtn');
+        let videoFile = null;
+
+        videoInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                videoFile = e.target.files[0];
+                document.getElementById('videoPreviewContainer').classList.remove('hidden');
+            }
+        });
+
+        extractBtn.addEventListener('click', async () => {
+            if (!videoFile) return;
+
+            const progressContainer = document.getElementById('extractProgress');
+            const progressBar = document.getElementById('extractProgressBar');
+            const statusText = document.getElementById('extractStatus');
+            const video = document.getElementById('hiddenVideo');
+            const canvas = document.getElementById('hiddenCanvas');
+            const ctx = canvas.getContext('2d');
+            const fps = parseInt(document.getElementById('extractFps').value) || 24;
+            const format = document.getElementById('extractFormat').value;
+            const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
+            const ext = format === 'png' ? 'png' : 'jpg';
+
+            extractBtn.disabled = true;
+            extractBtn.classList.add('opacity-50');
+            progressContainer.classList.remove('hidden');
+
+            const zip = new JSZip();
+            const videoUrl = URL.createObjectURL(videoFile);
+            video.src = videoUrl;
+
+            await new Promise(r => video.onloadedmetadata = r);
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const duration = video.duration;
+            const totalFrames = Math.floor(duration * fps);
+            const interval = 1 / fps;
+            let currentTime = 0;
+            let frameCount = 0;
+
+            const processFrame = async () => {
+                if (currentTime >= duration) {
+                    statusText.textContent = "Архивация... (Подождите)";
+                    const content = await zip.generateAsync({type:"blob"}, (metadata) => {
+                         progressBar.style.width = `${metadata.percent.toFixed(0)}%`;
+                         statusText.textContent = `Сжатие ZIP: ${metadata.percent.toFixed(0)}%`;
+                    });
+                    
+                    const zipName = videoFile.name.split('.')[0] + "_frames.zip";
+                    saveAs(content, zipName);
+                    
+                    statusText.textContent = "Готово!";
+                    extractBtn.disabled = false;
+                    extractBtn.classList.remove('opacity-50');
+                    URL.revokeObjectURL(videoUrl);
+                    return;
+                }
+
+                video.currentTime = currentTime;
+                await new Promise(resolve => {
+                    const onSeek = () => {
+                        video.removeEventListener('seeked', onSeek);
+                        resolve();
+                    };
+                    video.addEventListener('seeked', onSeek);
+                });
+
+                ctx.drawImage(video, 0, 0);
+                const blob = await new Promise(r => canvas.toBlob(r, mimeType, 0.95));
+                
+                // 5 digits padding for correct sorting (00001.png)
+                const fileName = `${String(frameCount).padStart(5, '0')}.${ext}`;
+                zip.file(fileName, blob);
+
+                frameCount++;
+                currentTime += interval;
+                
+                // Update UI every few frames to save performance
+                if(frameCount % 5 === 0) {
+                    progressBar.style.width = `${(currentTime/duration)*100}%`;
+                    statusText.textContent = `Кадр ${frameCount} / ${totalFrames}`;
+                }
+
+                requestAnimationFrame(processFrame);
+            };
+            processFrame();
+        });
+
+        // --- PART 2: CREATE LOGIC (WEBCODECS) ---
+        const zipInput = document.getElementById('zipInput');
+        const createBtn = document.getElementById('createBtn');
+        let zipFile = null;
+
+        zipInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                zipFile = e.target.files[0];
+                document.getElementById('zipFileName').textContent = zipFile.name;
+                document.getElementById('zipPreviewContainer').classList.remove('hidden');
+            }
+        });
+
+        createBtn.addEventListener('click', async () => {
+            if (!zipFile) return;
+
+            const progressContainer = document.getElementById('createProgress');
+            const progressBar = document.getElementById('createProgressBar');
+            const statusText = document.getElementById('createStatus');
+            const canvas = document.getElementById('assemblyCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // --- CONSTANTS ---
+            const FPS = 24;
+            // 10 Mbps = High Quality
+            const BITRATE = 10_000_000; 
+
+            createBtn.disabled = true;
+            createBtn.classList.add('opacity-50');
+            progressContainer.classList.remove('hidden');
+            statusText.textContent = "Чтение архива...";
+
+            try {
+                // 1. Load Zip
+                const zip = new JSZip();
+                const content = await zip.loadAsync(zipFile);
+                const imageFiles = Object.keys(content.files)
+                    .filter(f => f.match(/\.(jpg|jpeg|png)$/i) && !f.startsWith('__') && !content.files[f].dir)
+                    .sort();
+
+                if (imageFiles.length === 0) throw new Error("Нет изображений в ZIP");
+
+                // 2. Setup Dimensions
+                const firstImgData = await content.files[imageFiles[0]].async("blob");
+                const firstBitmap = await createImageBitmap(firstImgData);
+                canvas.width = firstBitmap.width;
+                canvas.height = firstBitmap.height;
+
+                // 3. Setup Muxer (MP4 Container)
+                let muxer = new Mp4Muxer.Muxer({
+                    target: new Mp4Muxer.ArrayBufferTarget(),
+                    video: {
+                        codec: 'avc',
+                        width: canvas.width,
+                        height: canvas.height
+                    },
+                    fastStart: 'in-memory', // Enables streaming playback immediately
+                    firstTimestampBehavior: 'offset'
+                });
+
+                // 4. Setup VideoEncoder
+                const videoEncoder = new VideoEncoder({
+                    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+                    error: (e) => { console.error(e); alert("Ошибка энкодера: " + e.message); }
+                });
+
+                videoEncoder.configure({
+                    codec: 'avc1.4d002a', // H.264 High Profile (widely supported)
+                    width: canvas.width,
+                    height: canvas.height,
+                    bitrate: BITRATE,
+                    framerate: FPS
+                });
+
+                // 5. Render Loop
+                statusText.textContent = "Рендеринг видео...";
+                
+                for (let i = 0; i < imageFiles.length; i++) {
+                    const fileData = await content.files[imageFiles[i]].async("blob");
+                    const imgBitmap = await createImageBitmap(fileData);
+
+                    // Draw to canvas (optional, just for preview)
+                    ctx.drawImage(imgBitmap, 0, 0);
+
+                    // Calculate timestamp in microseconds
+                    // 1 second = 1,000,000 microseconds
+                    const timestamp = (i * 1_000_000) / FPS;
+
+                    // Create VideoFrame from Bitmap
+                    const frame = new VideoFrame(imgBitmap, { timestamp: timestamp });
+
+                    // Encode
+                    videoEncoder.encode(frame, { keyFrame: i % 24 === 0 });
+                    frame.close();
+                    imgBitmap.close(); // Important to release memory
+
+                    // UI Update
+                    if (i % 5 === 0) {
+                        const pct = Math.round((i / imageFiles.length) * 100);
+                        progressBar.style.width = `${pct}%`;
+                        statusText.textContent = `Обработка кадра ${i}/${imageFiles.length}`;
+                        // Give UI a moment to breathe
+                        await new Promise(r => setTimeout(r, 0));
+                    }
+                }
+
+                // 6. Finalize
+                statusText.textContent = "Финализация MP4...";
+                await videoEncoder.flush();
+                muxer.finalize();
+
+                const { buffer } = muxer.target;
+                const blob = new Blob([buffer], { type: 'video/mp4' });
+                
+                const vidName = zipFile.name.split('.')[0] + "_HQ_24fps.mp4";
+                saveAs(blob, vidName);
+
+                statusText.textContent = "Готово! Видео сохранено.";
+                createBtn.disabled = false;
+                createBtn.classList.remove('opacity-50');
+
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка: " + e.message);
+                createBtn.disabled = false;
+                createBtn.classList.remove('opacity-50');
+            }
+        });
+    </script>
+</body>
+</html>
